@@ -1,0 +1,182 @@
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1e38 100%);
+    color: #f8fafc;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.dashboard-container {
+    background: #1e293b;
+    padding: 35px;
+    border-radius: 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    width: 100%;
+    max-width: 750px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+h1 {
+    font-size: 32px;
+    text-align: center;
+    margin-bottom: 35px;
+    font-weight: 800;
+    background: linear-gradient(to right, #38bdf8, #818cf8);
+    h1 {
+    font-size: 32px;
+    text-align: center;
+    margin-bottom: 35px;
+    font-weight: 800;
+    background: linear-gradient(to right, #38bdf8, #818cf8);
+    
+    /* ADD THIS LINE RIGHT HERE FOR BROWSER COMPATIBILITY */
+    background-clip: text; 
+    
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+    -webkit-text-fill-color: transparent;
+}
+
+h2 {
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Metrics Dashboard Grid with Hover Elevate effects */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.card {
+    background: #0f172a;
+    padding: 22px;
+    border-radius: 16px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+.card h3 {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 10px;
+}
+
+.card p {
+    font-size: 22px;
+    font-weight: 800;
+}
+
+.balance p { color: #38bdf8; }
+.income p { color: #34d399; }
+.expense p { color: #f87171; }
+
+/* Interactive Warning State Override */
+.overspent-alert {
+    background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%);
+    animation: shake 0.4s ease-in-out;
+}
+
+/* Forms layout controls */
+.form-group {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+}
+
+input, select, button#submit-btn {
+    padding: 14px 18px;
+    font-size: 15px;
+    border-radius: 12px;
+    outline: none;
+    border: 2px solid #334155;
+    background: #0f172a;
+    color: #f8fafc;
+    transition: all 0.2s ease;
+}
+
+input[type="text"] { flex: 2; min-width: 200px; }
+input[type="number"] { flex: 1; min-width: 120px; }
+select { flex: 1; min-width: 130px; cursor: pointer; }
+
+input:focus, select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+button#submit-btn {
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+button#submit-btn:hover {
+    opacity: 0.95;
+    transform: scale(1.03);
+}
+
+/* History Ledger lists */
+ul#ledger-list {
+    list-style: none;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+li.transaction-item {
+    background: #0f172a;
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 5px solid #cbd5e1;
+    animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+li.income-type { border-left-color: #34d399; }
+li.expense-type { border-left-color: #f87171; }
+
+.item-desc { font-weight: 600; font-size: 16px; }
+.item-amt { font-weight: 800; font-size: 16px; }
+
+.income-type .item-amt { color: #34d399; }
+.expense-type .item-amt { color: #f87171; }
+
+/* Micro-Animation Frameworks */
+@keyframes popIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Tracker</title>
+    <link rel="stylesheet" href="https://cloudflare.com">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <h1>📊 Capital Tracker</h1>
+        
+        <!-- Live Calculation Displays -->
+        <div class="metrics-grid">
+            <div class="card balance">
+                <h3>Net Balance</h3>
+                <p id="total-balance">₦0.00</p>
+            </div>
+            <div class="card income">
+                <h3>Total Income</h3>
+                <p id="total-income">+ ₦0.00</p>
+            </div>
+            <div class="card expense">
+                <h3>Total Expenses</h3>
+                <p id="total-expense">- ₦0.00</p>
+            </div>
+        </div>
+
+        <!-- Add Transaction Form -->
+        <div class="form-section">
+            <h2>Log New Transaction</h2>
+            <div class="form-group">
+                <input type="text" id="desc-input" placeholder="e.g., Grocery Shopping, Salary...">
+                <input type="number" id="amount-input" placeholder="Amount (₦)..." min="0" step="0.01">
+                <select id="type-select">
+                    <option value="income">🟢 Income</option>
+                    <option value="expense">🔴 Expense</option>
+                </select>
+                <button id="submit-btn"><i class="fas fa-plus"></i> Log Item</button>
+            </div>
+        </div>
+
+        <!-- Ledger History List -->
+        <div class="history-section">
+            <h2>Transaction Ledger</h2>
+            <ul id="ledger-list"></ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
