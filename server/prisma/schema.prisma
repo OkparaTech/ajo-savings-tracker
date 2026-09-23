@@ -1,0 +1,102 @@
+// Prisma schema for the Ajo Savings Tracker
+// Run `npx prisma migrate dev --name init` after setting DATABASE_URL to create these tables on Neon.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String       @id @default(uuid())
+  email       String       @unique
+  password    String // bcrypt hash, never plaintext
+  name        String
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+}
+
+model Group {
+  id                 String             @id @default(uuid())
+  name               String
+  contributionAmount Float
+  frequency          String             @default("monthly") // "weekly" | "monthly" | "daily"
+  inviteCode         String             @unique
+  currentRound       Int                @default(0)
+  createdAt          DateTime           @default(now())
+
+  // Real bank account contributions settle into (Paystack subaccount).
+  // Null until the admin completes bank-details setup — contributions are
+  // blocked until this is set, since there's nowhere for the money to go.
+  bankCode        String?
+  bankName        String?
+  accountNumber   String?
+  accountName     String?
+  subaccountCode  String?
+
+  memberships        Membership[]
+  payoutOrder        PayoutOrderEntry[]
+  contributions      Contribution[]
+  payoutHistory      Payout[]
+}
+
+// One row per (user, group) pair — this is what makes the app multi-user.
+// role decides who can manage the group (reorder payouts, record payouts, delete the group).
+model Membership {
+  id       String   @id @default(uuid())
+  userId   String
+  groupId  String
+  role     String   @default("member") // "admin" | "member"
+  joinedAt DateTime @default(now())
+
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group            Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contributions    Contribution[]
+  payouts          Payout[]
+  payoutOrderEntry PayoutOrderEntry?
+
+  @@unique([userId, groupId])
+}
+
+model PayoutOrderEntry {
+  id           String @id @default(uuid())
+  groupId      String
+  membershipId String @unique
+  position     Int
+
+  group      Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, position])
+}
+
+model Contribution {
+  id     String @id @default(uuid())
+  groupId      String
+  membershipId String
+  amount       Float
+  round        Int
+  date         DateTime @default(now())
+
+  // Every contribution now maps to a real Paystack payment.
+  paymentReference String  @unique
+  status           String  @default("pending") // "pending" | "success" | "failed"
+
+  group      Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+}
+
+model Payout {
+  id           String   @id @default(uuid())
+  groupId      String
+  membershipId String
+  amount       Float
+  round        Int
+  date         DateTime @default(now())
+
+  group      Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+}

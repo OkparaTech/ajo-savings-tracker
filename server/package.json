@@ -1,0 +1,38 @@
+{
+  "name": "ajo-savings-tracker-server",
+  "version": "2.0.0",
+  "description": "Backend API for the Ajo Savings Tracker (multi-user group savings tracker) - SD-04",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "ajo",
+    "thrift",
+    "group-savings",
+    "express",
+    "prisma",
+    "postgresql"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.19.1",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "prisma": "^5.19.1"
+  }
+}
