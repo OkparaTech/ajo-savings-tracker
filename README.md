@@ -62,7 +62,8 @@ Contributions are **real payments**, not self-reported entries:
 
 **Payouts remain a manual step by design.** Because contributions settle straight into the group's own bank account (not a balance this app holds), there's no pool of funds inside the app to programmatically transfer out. When it's someone's turn, the admin sends the money from their own bank/mobile banking app, then clicks "Record Payout" here just to log it and advance the round. Automating that side too — via Paystack Transfers, with each recipient's own bank details on file — is a reasonable next step, but was left out here since it adds another layer of financial-compliance surface area worth deciding on deliberately rather than defaulting into.
 
-**On going live for real:** Paystack's test keys work for development end-to-end (see below), but taking real money from real people requires switching to **live** keys, which needs your Paystack business account fully verified (business/ID documents). Read [Paystack's Nigeria docs](https://paystack.com/docs) before doing this with a real group's money, and note that I'm not a lawyer — get real advice if you're unsure whether this setup fits your group's situation.
+**On going live for real:** Paystack's test keys work for development end-to-end (see below), but taking real money from real people requires switching to **live** keys, which needs my Paystack business account fully verified (business/ID documents). Read [Paystack's Nigeria docs](https://paystack.com/docs).
+It will be going live for real after I am done testing that the app actually works well.
 
 ### Testing payments locally
 Paystack test keys accept these details on the checkout page — no real money moves:
