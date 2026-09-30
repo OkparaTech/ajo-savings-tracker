@@ -1,6 +1,3 @@
-// Prisma schema for the Ajo Savings Tracker
-// Run `npx prisma migrate dev --name init` after setting DATABASE_URL to create these tables on Neon.
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,92 +8,208 @@ datasource db {
 }
 
 model User {
-  id          String       @id @default(uuid())
-  email       String       @unique
-  password    String // bcrypt hash, never plaintext
-  name        String
-  createdAt   DateTime     @default(now())
-  memberships Membership[]
+  id            String         @id @default(uuid())
+  email         String         @unique
+  password      String
+  name          String
+  createdAt     DateTime       @default(now())
+  memberships   Membership[]
+  sessions      Session[]
+  emailVerified Boolean        @default(false)
+  accountTokens AccountToken[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  csrfToken String
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
 }
 
 model Group {
-  id                 String             @id @default(uuid())
-  name               String
-  contributionAmount Float
-  frequency          String             @default("monthly") // "weekly" | "monthly" | "daily"
-  inviteCode         String             @unique
-  currentRound       Int                @default(0)
-  createdAt          DateTime           @default(now())
-
-  // Real bank account contributions settle into (Paystack subaccount).
-  // Null until the admin completes bank-details setup — contributions are
-  // blocked until this is set, since there's nowhere for the money to go.
-  bankCode        String?
-  bankName        String?
-  accountNumber   String?
-  accountName     String?
-  subaccountCode  String?
-
-  memberships        Membership[]
-  payoutOrder        PayoutOrderEntry[]
-  contributions      Contribution[]
-  payoutHistory      Payout[]
+  id               String               @id @default(uuid())
+  name             String
+  contributionKobo Int
+  frequency        String               @default("monthly")
+  inviteCode       String               @unique
+  currentRound     Int                  @default(0)
+  cycleStartRound  Int                  @default(0)
+  cycleSize        Int                  @default(0)
+  status           String               @default("draft")
+  dueAt            DateTime?
+  createdAt        DateTime             @default(now())
+  bankCode         String?
+  bankName         String?
+  accountNumber    String?
+  accountName      String?
+  subaccountCode   String?
+  memberships      Membership[]
+  payoutOrder      PayoutOrderEntry[]
+  contributions    Contribution[]
+  payoutHistory    Payout[]
+  auditEvents      AuditEvent[]
+  bankChanges      BankChange[]
+  reconciliations  BankReconciliation[]
 }
 
-// One row per (user, group) pair — this is what makes the app multi-user.
-// role decides who can manage the group (reorder payouts, record payouts, delete the group).
 model Membership {
-  id       String   @id @default(uuid())
-  userId   String
-  groupId  String
-  role     String   @default("member") // "admin" | "member"
-  joinedAt DateTime @default(now())
-
-  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  group            Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  id               String            @id @default(uuid())
+  userId           String
+  groupId          String
+  role             String            @default("member")
+  active           Boolean           @default(true)
+  joinedAt         DateTime          @default(now())
+  user             User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  group            Group             @relation(fields: [groupId], references: [id], onDelete: Restrict)
   contributions    Contribution[]
   payouts          Payout[]
   payoutOrderEntry PayoutOrderEntry?
 
   @@unique([userId, groupId])
+  @@unique([id, groupId])
+  @@index([groupId, active])
 }
 
 model PayoutOrderEntry {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   groupId      String
-  membershipId String @unique
+  membershipId String     @unique
   position     Int
-
-  group      Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  group        Group      @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  membership   Membership @relation(fields: [membershipId, groupId], references: [id, groupId], onDelete: Restrict)
 
   @@unique([groupId, position])
+  @@unique([membershipId, groupId])
 }
 
 model Contribution {
-  id     String @id @default(uuid())
-  groupId      String
-  membershipId String
-  amount       Float
-  round        Int
-  date         DateTime @default(now())
+  id               String     @id @default(uuid())
+  groupId          String
+  membershipId     String
+  amountKobo       Int
+  refundedKobo     Int        @default(0)
+  disputed         Boolean    @default(false)
+  round            Int
+  date             DateTime   @default(now())
+  paymentReference String     @unique
+  idempotencyKey   String?    @unique
+  status           String     @default("pending")
+  currency         String     @default("NGN")
+  environment      String     @default("test")
+  subaccountCode   String?
+  authorizationUrl String?
+  lastCheckedAt    DateTime?
+  group            Group      @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  membership       Membership @relation(fields: [membershipId, groupId], references: [id, groupId], onDelete: Restrict)
+  refunds          Refund[]
 
-  // Every contribution now maps to a real Paystack payment.
-  paymentReference String  @unique
-  status           String  @default("pending") // "pending" | "success" | "failed"
+  @@index([groupId, round, status])
+  @@index([status, lastCheckedAt])
+}
 
-  group      Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+model Refund {
+  id             String       @id
+  contributionId String
+  amountKobo     Int
+  status         String
+  contribution   Contribution @relation(fields: [contributionId], references: [id], onDelete: Restrict)
 }
 
 model Payout {
-  id           String   @id @default(uuid())
-  groupId      String
-  membershipId String
-  amount       Float
-  round        Int
-  date         DateTime @default(now())
+  id                String     @id @default(uuid())
+  groupId           String
+  membershipId      String
+  amountKobo        Int
+  round             Int
+  date              DateTime   @default(now())
+  status            String     @default("awaiting_confirmation")
+  transferReference String?
+  idempotencyKey    String?    @unique
+  confirmedAt       DateTime?
+  group             Group      @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  membership        Membership @relation(fields: [membershipId, groupId], references: [id, groupId], onDelete: Restrict)
 
-  group      Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  @@unique([groupId, round])
+}
+
+model AuditEvent {
+  id          String   @id @default(uuid())
+  groupId     String
+  actorUserId String?
+  action      String
+  data        Json
+  createdAt   DateTime @default(now())
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@index([groupId, createdAt])
+}
+
+model BankChange {
+  id            String   @id @default(uuid())
+  groupId       String
+  proposedBy    String
+  bankCode      String
+  bankName      String
+  accountNumber String
+  accountName   String
+  approvals     Json
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  group         Group    @relation(fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@index([groupId, status])
+}
+
+model BankReconciliation {
+  id                 String   @id @default(uuid())
+  groupId            String
+  round              Int
+  balanceKobo        Int
+  statementReference String
+  actorUserId        String
+  createdAt          DateTime @default(now())
+  group              Group    @relation(fields: [groupId], references: [id], onDelete: Restrict)
+}
+
+model WebhookEvent {
+  id          String    @id
+  event       String
+  payload     Json
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
+model RateBucket {
+  id        String   @id
+  count     Int      @default(1)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model AccountToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  kind      String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+model Notification {
+  id        String    @id
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
 }
