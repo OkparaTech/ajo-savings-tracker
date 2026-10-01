@@ -89,3 +89,15 @@ After pending/disputed items are resolved, the administrator records a matching 
 ## Boundaries
 
 A ledger cannot eliminate administrator fraud or member default. Fixed rotation and evidence improve accountability; they do not insure savings. Payment charge confirmation does not mean bank settlement has completed. Operator access, database ownership, provider reconciliation, backups, mail deliverability and dispute handling remain operational responsibilities. Use a limited database role and review the launch checklist before collecting live payments.
+
+### Interface design and browser checks
+
+The frontend uses the **shared ledger** design system: a searchable circle directory, a state-aware next step, and separate round, ledger and group-detail views. Keyboard tabs, recovery flows, payment handoff, reduced motion and small-screen layouts are covered by browser tests. The audit, design direction and preserved contracts are recorded in [docs/DESIGN.md](docs/DESIGN.md).
+
+```bash
+cd server
+npx playwright install --with-deps chromium
+npm run test:ui
+```
+
+Browser tests serve the actual application assets and security headers with synthetic API fixtures; they do not contact Paystack or send email. The existing PostgreSQL integration suite validates the financial backend separately. CI runs both suites. Screenshots and traces are written to `server/test-results/`; failed CI runs upload that directory for inspection.
