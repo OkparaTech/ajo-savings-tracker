@@ -1,199 +1,91 @@
-# 🤝 Ajo Savings Tracker (SD-04)
+# Ajo Savings Tracker
 
-A real, multi-user web app for tracking group savings ("Ajo" / "thrift" / "esusu").
-Each member has their own account; groups are joined with an invite code; only the
-group admin manages the payout order and records payouts. Contributions and
-payouts are permanent, stored in a real Postgres database — this is meant to be
-used for real, ongoing rounds, not just a demo.
+A shared savings ledger with fixed rotation cycles, Paystack contributions, and recipient-confirmed **manual** payouts.
 
-> Originally a personal "Finance Tracker" (Go + vanilla JS). Rebuilt for SD-04:
-> backend rewritten from Go → Node.js/Express, storage moved from a JSON file →
-> PostgreSQL (via Prisma), and accounts/authentication were added so a real
-> group can use it together.
+Contributions settle to the group’s nominated bank account. This application does not hold savings, execute payouts, verify bank statements automatically, or guarantee that an administrator will transfer funds. A displayed ledger balance is an estimate, not a live bank balance.
 
----
+## What changed in version 3
 
-## Tech Stack
+- Integer kobo throughout the financial model; positive-value, currency, round and role constraints in PostgreSQL.
+- Draft → active → completed cycles. Roster, bank account and payout order are fixed during an active cycle.
+- Partial contributions track the actual remaining obligation. Pending intents reserve their amount to prevent duplicate checkout.
+- Payment intents are committed before provider checkout. Reference, amount, currency, environment and subaccount are checked before crediting a payment.
+- Durable signed webhook inbox, retries, operator reconciliation, refund tracking and dispute holds.
+- Group-row locking, idempotent payments and payouts, and one payout record per group round.
+- Manual payout evidence, a recent settled-bank-balance attestation, and recipient acknowledgement before the next round.
+- Group archive and member deactivation preserve all financial history. Database triggers protect audit events and bank attestations from update/delete.
+- Bank account changes require every active member’s approval and administrator password confirmation.
+- Opaque, hashed, revocable 12-hour sessions; secure cookies in production; CSRF and Origin checks; shared database-backed request limits.
+- Email verification, password reset, password change, overdue contribution reminders, CSV export and activity history.
+- Responsive, accessible interface with exact obligations, clear state labels, network errors and guarded submission buttons.
 
-| Layer     | Tech                                                        |
-|-----------|--------------------------------------------------------------|
-| Frontend  | Vanilla HTML / CSS / JavaScript (no build step)               |
-| Backend   | Node.js + Express                                             |
-| Database  | PostgreSQL, hosted on [Neon](https://neon.tech)                |
-| ORM       | Prisma                                                          |
-| Auth      | Email + password, bcrypt-hashed, JWT in an httpOnly cookie      |
-| Payments  | [Paystack](https://paystack.com) — real contributions, not self-reported |
-| Hosting   | [Render](https://render.com)                                    |
+## Stack
 
----
+Node.js 22+, Express 4, PostgreSQL, Prisma 5, Paystack, Nodemailer SMTP, plain HTML/CSS/JavaScript. There is no frontend build step.
 
-## Project Structure
+## Local setup
 
-```
-ajo-savings-tracker/
-├── public/                    # Frontend (served statically by Express)
-│   ├── index.html
-│   ├── style.css
-│   └── script.js
-├── server/
-│   ├── server.js               # Express app + all API routes
-│   ├── src/
-│   │   ├── prismaClient.js     # Shared Prisma client instance
-│   │   ├── auth.js             # Password hashing, JWT, auth middleware
-│   │   └── inviteCode.js       # Invite code generator
-│   ├── prisma/
-│   │   └── schema.prisma       # Database schema (Users, Groups, Memberships, ...)
-│   ├── package.json
-│   └── .env.example
-├── .gitignore
-└── README.md
-```
-
----
-
-## How Money Actually Moves
-
-Contributions are **real payments**, not self-reported entries:
-
-1. The group admin adds the group's real bank account (bank + account number). The app verifies it's a real, named account via Paystack, then creates a **Paystack Subaccount** so payments route straight there.
-2. When a member contributes, the app starts a real Paystack transaction and redirects them to Paystack's checkout (card, bank transfer, or USSD).
-3. Paystack settles the money directly into the group's bank account (subaccount settlement, usually next business day) — it never passes through or sits inside this app.
-4. Paystack calls this app's webhook (`/api/webhooks/paystack`) to confirm the payment; only then is the contribution marked `success` and counted toward the pool. A signature check on the webhook (`PAYSTACK_SECRET_KEY`-based HMAC) makes sure only real Paystack events are trusted.
-
-**Payouts remain a manual step by design.** Because contributions settle straight into the group's own bank account (not a balance this app holds), there's no pool of funds inside the app to programmatically transfer out. When it's someone's turn, the admin sends the money from their own bank/mobile banking app, then clicks "Record Payout" here just to log it and advance the round. Automating that side too — via Paystack Transfers, with each recipient's own bank details on file — is a reasonable next step, but was left out here since it adds another layer of financial-compliance surface area worth deciding on deliberately rather than defaulting into.
-
-**On going live for real:** Paystack's test keys work for development end-to-end (see below), but taking real money from real people requires switching to **live** keys, which needs my Paystack business account fully verified (business/ID documents). Read [Paystack's Nigeria docs](https://paystack.com/docs).
-It will be going live for real after I am done testing that the app actually works well.
-
-### Testing payments locally
-Paystack test keys accept these details on the checkout page — no real money moves:
-- **Card:** `4084084084084081`, any future expiry, CVV `408`, PIN `0000`, OTP `123456`
-- Full list of test cards: https://paystack.com/docs/payments/test-payments
-
-Paystack also needs to reach your webhook. Locally, use a tunnel like `ngrok http 8080`
-and set the resulting URL + `/api/webhooks/paystack` as your webhook URL in the
-Paystack dashboard (Settings → API Keys & Webhooks) while testing. In production,
-use your Render URL.
-
-## Data Model
-
-- **User** — an account (email, hashed password, name).
-- **Group** — a savings group (name, contribution amount, frequency, invite code, current round, plus the real bank account/Paystack subaccount contributions settle into).
-- **Membership** — links a User to a Group, with a `role` of `admin` or `member`. This is what makes the app multi-user: every group action is scoped to a membership, not just a group.
-- **PayoutOrderEntry** — the rotation queue: one row per membership, with a `position`.
-- **Contribution** — a logged payment, tied to a membership and a round number.
-- **Payout** — a recorded payout to a membership for a given round.
-
----
-
-## Running Locally
-
-**Requirements:** Node.js 18+, npm, and a Neon Postgres database.
-
-### 1. Get your Neon connection string
-In your Neon project dashboard → **Connection Details** → copy the **pooled
-connection** string. It looks like:
-```
-postgresql://<user>:<password>@<host>/<dbname>?sslmode=require
-```
-
-### 2. Configure environment variables
-```bash
+```sh
 cd server
 cp .env.example .env
-```
-Open `.env` and paste your Neon string into `DATABASE_URL`. Generate a
-`JWT_SECRET` with:
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-and paste that into `JWT_SECRET`. Then grab your **test** API keys from your
-Paystack dashboard (Settings → API Keys & Webhooks) and paste them into
-`PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY`.
-
-### 3. Install dependencies and create the database tables
-```bash
-npm install
-npx prisma migrate dev --name init
-```
-This reads `prisma/schema.prisma` and creates the tables on your Neon database.
-`postinstall` also runs `prisma generate` automatically after `npm install`.
-
-### 4. Start the server
-```bash
+npm ci
+npm run prisma:deploy
 npm start
 ```
-Open **http://localhost:8080** — sign up, create a group, and try the invite
-code flow by signing up a second account in a private/incognito window.
 
-Use `npm run dev` for auto-restart on file changes.
+Fill in the database URL and Paystack test key first. Open the origin configured in `APP_URL`; using a different origin will correctly reject mutations. SMTP is optional for local test mode, but verification/recovery emails are unavailable until configured. Production startup requires SMTP configuration and an HTTPS `APP_URL`.
 
----
+## Group workflow
 
-## API Reference
+1. Create a draft group. Invite at least one other member.
+2. Administrator proposes the bank account. Every active member approves; the last approval applies the agreed Paystack subaccount. With one member, the administrator explicitly approves/applies the proposal.
+3. Agree on payout order and start the cycle. Contributions are closed outside an active cycle.
+4. Each member pays their outstanding contribution through Paystack. Partial payments leave a remaining amount due. Check a pending payment before trying another checkout.
+5. Administrator checks the settled bank funds and records a statement/evidence reference. This is an attestation, not an automatic verification.
+6. After making the actual bank transfer, administrator records the transfer reference. The app requires all current contributions, sufficient ledger funds and a recent sufficient bank attestation.
+7. Only the recipient confirms receipt. The round advances once. An unreceived payout can be disputed, pausing the group for review.
+8. After every member’s turn, the cycle completes. Change roster/order or transfer administrator responsibility before starting another cycle.
 
-All endpoints are prefixed with `/api`. Every route except `/auth/signup`,
-`/auth/login`, and `/health` requires a valid session cookie.
+Member removal rotates the invite code and blocks self-rejoining by that former member. Financial history remains in the ledger and CSV export. Membership cannot change during a cycle.
 
-| Method | Route                                   | Who              | Description                                   |
-|--------|-------------------------------------------|------------------|-------------------------------------------------|
-| POST   | `/auth/signup`                            | anyone           | Create an account `{ name, email, password }`     |
-| POST   | `/auth/login`                             | anyone           | Log in `{ email, password }`                      |
-| POST   | `/auth/logout`                            | logged in        | Clear the session                                  |
-| GET    | `/auth/me`                                | logged in        | Current user info                                  |
-| GET    | `/groups`                                 | logged in        | Groups the user belongs to (summary)               |
-| POST   | `/groups`                                 | logged in        | Create a group `{ name, contributionAmount, frequency }` — creator becomes admin |
-| POST   | `/groups/join`                            | logged in        | Join a group `{ inviteCode }`                      |
-| GET    | `/groups/:id`                             | member           | Full group detail                                  |
-| DELETE | `/groups/:id`                             | admin            | Delete the group                                    |
-| DELETE | `/groups/:id/members/:membershipId`       | admin            | Remove a member                                     |
-| PUT    | `/groups/:id/payout-order`                | admin            | Reorder the rotation `{ order: [membershipId, ...] }` |
-| GET    | `/paystack/banks`                         | logged in        | List of Nigerian banks for the bank-details dropdown |
-| POST   | `/groups/:id/bank-details`                | admin            | Verify & save the group's real payout account `{ bankCode, accountNumber }` |
-| POST   | `/groups/:id/contributions/initiate`      | member           | Start a real payment for **your own** contribution `{ amount? }` — returns a Paystack checkout URL |
-| GET    | `/payments/callback`                      | anyone (redirect)| Where Paystack sends the member back after checkout   |
-| POST   | `/webhooks/paystack`                      | Paystack only     | Confirms payment success server-to-server (signature-verified) |
-| POST   | `/groups/:id/payout`                      | admin            | Record that the current recipient was paid (manual bank transfer) & advance the round |
-| GET    | `/health`                                 | anyone           | Health check                                         |
+## Validation
 
----
+```sh
+cd server
+npm run check
+npx prisma validate
+npm test
+# Use an empty/disposable PostgreSQL database ending in _test:
+DATABASE_URL="$TEST_DATABASE_URL" npm run prisma:deploy
+npm run test:integration
+npm audit --omit=dev
+```
 
-## Deploying to Render
+Integration tests exercise actual Prisma queries and constraints, account sessions, CSRF, permissions, account approvals, queue swapping, checkout and payout concurrency, partial payments, webhook persistence/retries, refunds, exports, recovery links and reminders. Provider and SMTP calls are mocked; no real funds move. GitHub Actions runs against PostgreSQL 16 with multiple connections.
 
-1. Push this repo to GitHub.
-2. On [render.com](https://render.com) → **New +** → **Web Service** → connect the repo.
-3. Set:
-   - **Root Directory:** `server`
-   - **Build Command:** `npm install && npx prisma migrate deploy`
-   - **Start Command:** `npm start`
-4. Under **Environment**, add:
-   - `DATABASE_URL` — your Neon connection string
-   - `JWT_SECRET` — the same random string you generated locally (or a new one — just don't rotate it while people have active sessions)
-   - `NODE_ENV` — `production`
-5. Deploy. Render gives you a public URL — that's the live link to share with your group.
+## Deployment and existing data
 
-Because the database lives on Neon (not on Render's disk), your data survives
-redeploys, restarts, and free-tier spin-downs — this is what makes the app
-safe to actually rely on long-term.
+Read [the deployment runbook](docs/DEPLOYMENT.md) before upgrading an existing installation. **Do not deploy the new application before its migration.** The migration is transactional, preserves rows, checks legacy anomalies and puts groups with financial history into review. Existing login cookies are invalidated; users must log in again.
 
----
+## Operations
 
-## Demo Video
+The server checks pending inbox events and payment intents every minute while running. Run a dedicated scheduled worker if the hosting service sleeps:
 
-A 2–3 minute walkthrough should cover:
-1. Signing up and creating a group (note the invite code).
-2. As the admin, adding the group's real bank account (Paystack verifies it live).
-3. Signing up as a second user and joining with that code.
-4. Reordering the payout queue as the admin.
-5. Making a real contribution as a regular member (Paystack test card checkout) and seeing it land in the ledger as confirmed.
-6. Recording a payout as the admin and seeing the round advance.
+```sh
+cd server
+npm run reconcile
+```
 
----
+The worker processes up to 25 inbox items and 25 payment intents per pass. Failed inbox items move to `attention` after ten attempts so one malformed event cannot starve all later events. Monitor and resolve these records; do not simply mark them processed.
 
-## Possible Next Steps
+Historical intents have no trustworthy destination snapshot and are not guessed. An operator can recover the snapshot from the provider:
 
-- Email verification and "forgot password" flow.
-- Reminders/notifications for members who haven't contributed this round.
-- Export ledger to CSV/PDF.
-- Let a member leave a group voluntarily (not just admin-removed).
-- Transfer admin role to another member.
+```sh
+npm run reconcile:legacy -- PAYMENT_REFERENCE
+```
+
+After pending/disputed items are resolved, the administrator records a matching recent bank balance and all active members approve financial review. Imported payouts remain explicitly labelled historical/unverified.
+
+## Boundaries
+
+A ledger cannot eliminate administrator fraud or member default. Fixed rotation and evidence improve accountability; they do not insure savings. Payment charge confirmation does not mean bank settlement has completed. Operator access, database ownership, provider reconciliation, backups, mail deliverability and dispute handling remain operational responsibilities. Use a limited database role and review the launch checklist before collecting live payments.

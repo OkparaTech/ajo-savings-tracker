@@ -1,12 +1,6 @@
-// src/inviteCode.js
-const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
-
-function generateInviteCode(length = 7) {
-  let code = '';
-  for (let i = 0; i < length; i++) {
-    code += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
-  }
-  return code;
+const crypto = require('crypto');
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function generateInviteCode(length = 10) {
+  return Array.from({ length }, () => ALPHABET[crypto.randomInt(ALPHABET.length)]).join('');
 }
-
 module.exports = { generateInviteCode };

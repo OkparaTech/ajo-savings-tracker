@@ -1,176 +1,161 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ajo Savings Tracker</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <div class="app">
-    <header class="app-header">
-      <h1>🤝 Ajo Savings Tracker</h1>
-      <p class="tagline">Track group savings, contributions and payout turns — together.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#183f35" />
+    <title>Ajo — Group savings, clearly accounted for</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/script.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Ajo home"
+        ><span class="brand-mark">a</span>Ajo<span class="brand-note">GROUP SAVINGS</span></a
+      >
+      <div id="account-controls" hidden>
+        <span id="welcome"></span
+        ><button id="verify-email-button" class="quiet" hidden>Verify email</button
+        ><button id="password-button" class="quiet">Change password</button
+        ><button id="logout-button" class="quiet">Log out</button>
+      </div>
     </header>
-
-    <!-- ================= AUTH VIEW ================= -->
-    <section id="auth-view" class="view hidden">
-      <div class="card auth-card">
-        <div class="auth-tabs">
-          <button id="tab-login" class="auth-tab active">Log In</button>
-          <button id="tab-signup" class="auth-tab">Sign Up</button>
+    <main>
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <section id="auth-view" class="auth-layout" hidden>
+        <div class="intro">
+          <p class="eyebrow">SAVE TOGETHER. SEE EVERY STEP.</p>
+          <h1>A clear record.<br />A fair rotation.</h1>
+          <p>Know what is due, what has been paid, and whose turn comes next.</p>
+          <div class="promise">
+            <span>01</span>
+            <p>Members and payout order stay fixed during a savings cycle.</p>
+            <span>02</span>
+            <p>Every confirmed contribution has a payment reference.</p>
+            <span>03</span>
+            <p>The recipient confirms a manual payout before the next round.</p>
+          </div>
+          <p class="small">
+            Contributions settle into your group’s nominated bank account. Ajo records activity; it
+            does not hold or guarantee your savings.
+          </p>
         </div>
-
-        <form id="login-form" class="form-card">
-          <div class="form-row"><input type="email" id="login-email" placeholder="Email" required /></div>
-          <div class="form-row"><input type="password" id="login-password" placeholder="Password" required /></div>
-          <p id="login-error" class="error-text hidden"></p>
-          <button type="submit" class="btn btn-primary">Log In</button>
-        </form>
-
-        <form id="signup-form" class="form-card hidden">
-          <div class="form-row"><input type="text" id="signup-name" placeholder="Full name" required /></div>
-          <div class="form-row"><input type="email" id="signup-email" placeholder="Email" required /></div>
-          <div class="form-row"><input type="password" id="signup-password" placeholder="Password (min. 8 characters)" required minlength="8" /></div>
-          <p id="signup-error" class="error-text hidden"></p>
-          <button type="submit" class="btn btn-primary">Create Account</button>
-        </form>
-      </div>
-    </section>
-
-    <!-- ================= GROUPS LIST VIEW ================= -->
-    <section id="groups-view" class="view hidden">
-      <div class="section-head">
-        <span id="welcome-msg" class="welcome-msg"></span>
-        <button id="logout-btn" class="btn btn-ghost btn-sm">Log Out</button>
-      </div>
-
-      <div class="section-head">
-        <h2>Your Groups</h2>
-        <div class="row-actions">
-          <button id="join-group-btn" class="btn btn-secondary btn-sm">Join with Code</button>
-          <button id="new-group-btn" class="btn btn-primary">+ New Group</button>
+        <div class="panel auth-panel">
+          <div class="tabs">
+            <button id="login-tab" class="selected" type="button">Log in</button
+            ><button id="signup-tab" type="button">Create account</button>
+          </div>
+          <form id="auth-form">
+            <h2 id="auth-heading">Welcome back</h2>
+            <div id="name-field" hidden>
+              <label for="auth-name">Full name</label
+              ><input id="auth-name" name="name" maxlength="80" autocomplete="name" />
+            </div>
+            <label for="auth-email">Email address</label
+            ><input
+              id="auth-email"
+              name="email"
+              type="email"
+              required
+              maxlength="254"
+              autocomplete="email"
+            /><label for="auth-password">Password</label
+            ><input
+              id="auth-password"
+              name="password"
+              type="password"
+              required
+              autocomplete="current-password"
+            />
+            <p id="password-hint" class="small" hidden>
+              Use at least 12 characters. Maximum 72 bytes.
+            </p>
+            <button class="primary full" id="auth-submit">Log in</button
+            ><button type="button" id="forgot-password-button" class="quiet">
+              Forgot password?
+            </button>
+            <p id="auth-error" class="error" role="alert"></p>
+          </form>
         </div>
-      </div>
-
-      <form id="join-group-form" class="card form-card hidden">
-        <div class="form-row">
-          <input type="text" id="join-code-input" placeholder="Invite code (e.g. AB12CD3)" required />
-          <button type="submit" class="btn btn-primary btn-sm">Join</button>
-          <button type="button" id="cancel-join-group" class="btn btn-ghost btn-sm">Cancel</button>
+      </section>
+      <section id="groups-view" hidden>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">YOUR SAVINGS CIRCLES</p>
+            <h1>Keep the group in sync.</h1>
+            <p class="muted">
+              A shared record of contributions, obligations, and confirmed payouts.
+            </p>
+          </div>
+          <div class="actions">
+            <button id="join-button" class="secondary">Join a group</button
+            ><button id="create-button" class="primary">Create group</button>
+          </div>
         </div>
-        <p id="join-error" class="error-text hidden"></p>
+        <div id="groups-list" class="groups-grid"></div>
+      </section>
+      <section id="group-view" hidden>
+        <button id="back-button" class="quiet back">← Your groups</button>
+        <div id="group-heading" class="page-heading"></div>
+        <div id="group-summary" class="metrics"></div>
+        <div id="group-guidance" class="guidance"></div>
+        <div class="workspace">
+          <div>
+            <section class="panel">
+              <div class="section-title">
+                <h2>Contribution obligations</h2>
+                <span id="due-label" class="small"></span>
+              </div>
+              <div id="obligations"></div>
+              <button id="pay-button" class="primary full">Make a contribution</button>
+            </section>
+            <section class="panel">
+              <div class="section-title">
+                <h2>Payout rotation</h2>
+                <button id="save-order" class="quiet" hidden>Save order</button>
+              </div>
+              <ol id="rotation" class="rotation"></ol>
+            </section>
+            <section id="bank-panel" class="panel"></section>
+          </div>
+          <div>
+            <section id="payout-panel" class="panel"></section>
+            <section class="panel">
+              <div class="section-title">
+                <h2>Financial record</h2>
+                <a id="export-link" class="quiet" href="#">Export CSV</a>
+              </div>
+              <div class="tabs record-tabs">
+                <button data-record="contributions" class="selected">Contributions</button
+                ><button data-record="payouts">Payouts</button
+                ><button data-record="audit">Activity</button>
+              </div>
+              <div id="records" class="records"></div>
+              <p class="small">
+                Latest 100 financial records / 50 activity events shown. Export the full financial
+                history as CSV.
+              </p>
+            </section>
+            <section id="members-panel" class="panel"></section>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer>
+      Shared records. Clear obligations.
+      <span>Manual payouts need bank evidence and recipient confirmation.</span>
+    </footer>
+    <dialog id="action-dialog">
+      <form id="action-form">
+        <div class="section-title">
+          <h2 id="action-title"></h2>
+          <button type="button" id="close-dialog" class="quiet" aria-label="Close dialog">✕</button>
+        </div>
+        <p id="action-description" class="muted"></p>
+        <div id="action-fields"></div>
+        <p id="action-error" class="error" role="alert"></p>
+        <button id="action-submit" class="primary full">Continue</button>
       </form>
-
-      <form id="new-group-form" class="card form-card hidden">
-        <div class="form-row">
-          <input type="text" id="group-name-input" placeholder="Group name (e.g. Office Ajo)" required />
-        </div>
-        <div class="form-row">
-          <input type="number" id="group-amount-input" placeholder="Contribution amount per member (₦)" min="1" step="0.01" required />
-          <select id="group-frequency-input" aria-label="Contribution frequency">
-            <option value="weekly">Weekly</option>
-            <option value="monthly" selected>Monthly</option>
-            <option value="daily">Daily</option>
-          </select>
-        </div>
-        <div class="form-row form-actions">
-          <button type="submit" class="btn btn-primary">Create Group</button>
-          <button type="button" id="cancel-new-group" class="btn btn-ghost">Cancel</button>
-        </div>
-      </form>
-
-      <div id="groups-grid" class="groups-grid"></div>
-      <p id="groups-empty" class="empty-state hidden">No groups yet — create one or join with an invite code.</p>
-    </section>
-
-    <!-- ================= GROUP DETAIL VIEW ================= -->
-    <section id="group-view" class="view hidden">
-      <button id="back-btn" class="btn btn-ghost back-btn">&larr; All Groups</button>
-
-      <div class="group-header">
-        <div class="group-header-left">
-          <h2 id="group-title">Group</h2>
-          <span id="group-meta" class="group-meta"></span>
-        </div>
-        <button id="delete-group-btn" class="btn btn-danger btn-sm hidden">Delete Group</button>
-      </div>
-
-      <div id="invite-banner" class="card invite-banner hidden">
-        Invite code: <strong id="invite-code-text"></strong>
-        <button id="copy-invite-btn" class="icon-btn" title="Copy">Copy</button>
-      </div>
-
-      <!-- Admin-only: set up the real bank account contributions settle into -->
-      <div id="bank-setup-card" class="card hidden">
-        <h3>Payout Bank Account</h3>
-        <p id="bank-configured-text" class="hint hidden"></p>
-        <form id="bank-details-form" class="form-row">
-          <select id="bank-select" aria-label="select your bank" required></select>
-          <input type="text" id="account-number-input" placeholder="10-digit account number" maxlength="10" required />
-          <button type="submit" class="btn btn-primary btn-sm">Verify &amp; Save</button>
-        </form>
-        <p id="bank-error" class="error-text hidden"></p>
-        <p class="hint">Members' contributions are paid by real bank transfer/card directly into this account via Paystack.</p>
-      </div>
-
-      <!-- Shown to non-admins when the admin hasn't set up the bank account yet -->
-      <div id="bank-missing-banner" class="card hidden">
-        <p class="hint">The group admin hasn't added a payout bank account yet, so contributions aren't open — check back soon.</p>
-      </div>
-
-      <div class="metrics-grid">
-        <div class="card metric"><h3>Total Pool</h3><p id="metric-pool">₦0.00</p></div>
-        <div class="card metric"><h3>Members</h3><p id="metric-members">0</p></div>
-        <div class="card metric highlight"><h3>Current Round Recipient</h3><p id="metric-recipient">—</p></div>
-        <div class="card metric"><h3>Round</h3><p id="metric-round">#1</p></div>
-      </div>
-
-      <div class="columns">
-        <div class="column">
-          <div class="card">
-            <h3>Members</h3>
-            <ul id="members-list" class="plain-list"></ul>
-          </div>
-
-          <div class="card">
-            <h3>Payout Order</h3>
-            <p class="hint">This is the rotation queue.</p>
-            <ol id="payout-order-list" class="plain-list ordered"></ol>
-            <button id="save-order-btn" class="btn btn-secondary btn-sm hidden">Save Order</button>
-          </div>
-        </div>
-
-        <div class="column">
-          <div class="card" id="contribution-card">
-            <h3>Make Your Contribution</h3>
-            <p class="hint">This is a real payment via Paystack (card, bank transfer or USSD) — it settles directly into the group's bank account.</p>
-            <form id="contribution-form" class="form-row">
-              <input type="number" id="contribution-amount-input" placeholder="Amount (₦) — leave blank for standard amount" min="1" step="0.01" />
-              <button type="submit" class="btn btn-primary btn-sm">Pay Now</button>
-            </form>
-          </div>
-
-          <div class="card payout-card">
-            <h3>Payout This Round</h3>
-            <p id="payout-status" class="hint"></p>
-            <button id="record-payout-btn" class="btn btn-accent hidden">Record Payout &amp; Advance Round</button>
-          </div>
-
-          <div class="card">
-            <h3>Contribution Ledger</h3>
-            <ul id="ledger-list" class="plain-list"></ul>
-          </div>
-
-          <div class="card">
-            <h3>Payout History</h3>
-            <ul id="history-list" class="plain-list"></ul>
-          </div>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <script src="script.js"></script>
-</body>
+    </dialog>
+  </body>
 </html>
