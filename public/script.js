@@ -1,5 +1,9 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
+const UI = window.AjoUI;
+let groupsCache = [],
+  workspaceTab = 'round',
+  dialogOpener = null;
 let user = null,
   group = null,
   authMode = 'login',
@@ -23,8 +27,7 @@ const escape = (value) =>
     (character) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character],
   );
-const badge = (status) =>
-  `<span class="badge ${escape(status)}">${escape(status.replaceAll('_', ' '))}</span>`;
+const badge = UI.badge;
 function notice(message, failure = false) {
   $('notice').textContent = message;
   $('notice').classList.toggle('failure', failure);
@@ -32,9 +35,20 @@ function notice(message, failure = false) {
 }
 function show(id) {
   for (const view of ['auth-view', 'groups-view', 'group-view']) $(view).hidden = view !== id;
+  $('boot-state').hidden = true;
   $('account-controls').hidden = !user;
+  $('guest-note').hidden = Boolean(user);
+  document.title =
+    id === 'group-view' && group
+      ? `${group.name} — Ajo`
+      : id === 'groups-view'
+        ? 'Your circles — Ajo'
+        : 'Ajo — Your shared savings ledger';
   if (user) {
     $('welcome').textContent = user.name;
+    $('account-initial').textContent = UI.initials(user.name);
+    $('environment-label').hidden = user.paymentEnvironment !== 'test';
+    $('greeting').textContent = `YOUR SHARED SAVINGS / ${user.name.split(' ')[0].toUpperCase()}`;
     $('verify-email-button').hidden = user.emailVerified;
   }
 }
@@ -63,6 +77,7 @@ async function request(url, options = {}) {
           .catch(() => ({ error: 'The service returned an unexpected response.' }));
   if (!response.ok) {
     if (response.status === 401) {
+      loadSequence++;
       user = null;
       show('auth-view');
     }
@@ -75,12 +90,14 @@ const post = (url, body = {}, headers = {}) =>
 async function busy(button, work) {
   if (button.disabled) return;
   button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
   try {
     await work();
   } catch (error) {
     notice(error.message, true);
   } finally {
     button.disabled = false;
+    button.removeAttribute('aria-busy');
   }
 }
 function fields(items) {
@@ -108,6 +125,8 @@ const passwordField = {
   autocomplete: 'current-password',
 };
 function dialog(title, description, items, handler, label = 'Continue') {
+  dialogOpener = document.activeElement;
+  $('account-menu').open = false;
   $('action-title').textContent = title;
   $('action-description').textContent = description;
   $('action-fields').innerHTML = fields(items);
@@ -115,36 +134,61 @@ function dialog(title, description, items, handler, label = 'Continue') {
   $('action-submit').textContent = label;
   actionHandler = handler;
   $('action-dialog').showModal();
+  $('action-fields').querySelector('input, select')?.focus();
 }
 $('close-dialog').onclick = () => $('action-dialog').close();
+$('action-dialog').addEventListener('cancel', (event) => {
+  if ($('action-submit').disabled) event.preventDefault();
+});
+$('action-dialog').addEventListener('close', () => {
+  if (dialogOpener?.isConnected && !dialogOpener.closest('[hidden]')) dialogOpener.focus();
+  else
+    document
+      .querySelector('#group-view:not([hidden]) h1, #groups-view:not([hidden]) h1, #auth-heading')
+      ?.focus();
+});
 $('action-form').onsubmit = async (event) => {
   event.preventDefault();
   const button = $('action-submit');
   if (button.disabled) return;
   button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  $('close-dialog').disabled = true;
+  const handler = actionHandler;
   $('action-error').textContent = '';
   try {
     const values = Object.fromEntries(new FormData(event.target));
-    await actionHandler(values);
+    await handler(values);
     $('action-dialog').close();
   } catch (error) {
     $('action-error').textContent = error.message;
   } finally {
     button.disabled = false;
+    button.removeAttribute('aria-busy');
+    $('close-dialog').disabled = false;
   }
 };
 function switchAuth(mode) {
   authMode = mode;
-  $('login-tab').classList.toggle('selected', mode === 'login');
-  $('signup-tab').classList.toggle('selected', mode === 'signup');
+  UI.selectTab($('login-tab'), mode === 'login');
+  UI.selectTab($('signup-tab'), mode === 'signup');
+  $('auth-form').setAttribute('aria-labelledby', `${mode}-tab`);
+  $('auth-description').textContent =
+    mode === 'signup'
+      ? 'Create your account, then start a circle or join your people.'
+      : 'Your circles, contributions and next steps, in one place.';
   $('name-field').hidden = mode !== 'signup';
   $('auth-name').required = mode === 'signup';
   $('password-hint').hidden = mode !== 'signup';
   $('auth-password').minLength = mode === 'signup' ? 12 : 1;
   $('auth-password').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
-  $('auth-heading').textContent = mode === 'signup' ? 'Start your shared record' : 'Welcome back';
+  $('auth-heading').textContent = mode === 'signup' ? 'Start something together.' : 'Welcome back.';
   $('auth-submit').textContent = mode === 'signup' ? 'Create account' : 'Log in';
   $('auth-error').textContent = '';
+  $('auth-password').type = 'password';
+  $('show-password').textContent = 'Show';
+  $('show-password').setAttribute('aria-label', 'Show password');
+  $('show-password').setAttribute('aria-pressed', 'false');
 }
 $('login-tab').onclick = () => switchAuth('login');
 $('signup-tab').onclick = () => switchAuth('signup');
@@ -153,15 +197,20 @@ $('auth-form').onsubmit = async (event) => {
   const button = $('auth-submit');
   if (button.disabled) return;
   button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
   $('auth-error').textContent = '';
   try {
     user = await post(`/auth/${authMode}`, Object.fromEntries(new FormData(event.target)));
     event.target.reset();
-    await loadGroups();
+    notice('');
+    await openLocation();
+    if (!$('group-view').hidden) $('group-heading').querySelector('h1').focus();
+    else $('groups-title').focus();
   } catch (error) {
     $('auth-error').textContent = error.message;
   } finally {
     button.disabled = false;
+    button.removeAttribute('aria-busy');
   }
 };
 $('logout-button').onclick = (event) =>
@@ -170,7 +219,10 @@ $('logout-button').onclick = (event) =>
     user = null;
     group = null;
     loadSequence++;
+    $('account-menu').open = false;
+    setRoute('');
     show('auth-view');
+    $('auth-email').focus();
     notice('');
   });
 $('verify-email-button').onclick = (event) =>
@@ -211,24 +263,82 @@ $('password-button').onclick = () =>
     },
     'Change password',
   );
-async function loadGroups() {
+function setRoute(hash) {
+  if (location.hash !== hash) history.pushState({}, '', location.pathname + hash);
+}
+function setWorkspace(tab, navigate = true) {
+  workspaceTab = ['round', 'ledger', 'details'].includes(tab) ? tab : 'round';
+  document.querySelectorAll('[data-workspace]').forEach((button) => {
+    const selected = button.dataset.workspace === workspaceTab;
+    UI.selectTab(button, selected);
+    $(`view-${button.dataset.workspace}`).hidden = !selected;
+  });
+  if (navigate && group) setRoute(`#group=${encodeURIComponent(group.id)}&view=${workspaceTab}`);
+}
+function renderDirectory() {
+  const query = $('group-search').value.trim().toLocaleLowerCase();
+  const status = $('group-filter').value;
+  const visible = groupsCache.filter(
+    (g) =>
+      (!query || g.name.toLocaleLowerCase().includes(query)) &&
+      (status === 'all' || g.status === status),
+  );
+  $('group-count').textContent = `${visible.length} of ${groupsCache.length} circles`;
+  $('groups-list').innerHTML = visible.length
+    ? visible.map(UI.groupRow).join('')
+    : groupsCache.length
+      ? UI.empty('No matching circles.', 'Try a different name or status.') +
+        '<div class="empty compact"><button class="secondary" data-directory="clear">Clear filters</button></div>'
+      : UI.empty(
+          'Your first circle starts here.',
+          'Create a group with people you know, or join an existing group using their invite code.',
+        ) +
+        '<div class="empty compact"><div class="actions"><button class="primary" data-directory="create">Create a circle</button><button class="secondary" data-directory="join">Join with a code</button></div></div>';
+}
+async function loadGroups(navigate = true) {
   const sequence = ++loadSequence;
   show('groups-view');
-  $('groups-list').innerHTML = '<p class="empty">Loading your groups…</p>';
-  const groups = await request('/groups');
-  if (sequence !== loadSequence) return;
-  $('groups-list').innerHTML = groups.length
-    ? groups
-        .map(
-          (g) =>
-            `<button class="group-card" data-group="${escape(g.id)}">${badge(g.status)}<h2>${escape(g.name)}</h2><strong>${formatMoney(g.availableBalance)}</strong><p>Estimated ledger balance · not verified bank funds</p><p>${g.memberCount} members · ${escape(g.frequency)} · ${formatMoney(g.contributionAmount)} each</p></button>`,
-        )
-        .join('')
-    : '<div class="panel empty">No groups yet. Create a savings circle or ask your administrator for an invite code.</div>';
+  if (navigate) setRoute('');
+  $('directory-tools').hidden = true;
+  $('directory-summary').textContent = '';
+  $('groups-list').setAttribute('aria-busy', 'true');
+  $('groups-list').innerHTML =
+    '<p class="loading-caption"><span class="loading-line" aria-hidden="true"></span> Loading your circles…</p><div class="loading-row" aria-hidden="true"><span class="skeleton"></span></div><div class="loading-row" aria-hidden="true"><span class="skeleton"></span></div>';
+  try {
+    const groups = await request('/groups');
+    if (sequence !== loadSequence) return;
+    groupsCache = groups;
+    $('directory-tools').hidden = groups.length < 2;
+    if (groups.length < 2) {
+      $('group-search').value = '';
+      $('group-filter').value = 'all';
+    }
+    const active = groups.filter((g) => g.status === 'active').length;
+    const review = groups.filter((g) => g.status === 'review').length;
+    $('directory-summary').innerHTML =
+      `<span><strong>${groups.length}</strong> ${groups.length === 1 ? 'circle' : 'circles'}</span><span><strong>${active}</strong> active</span>${review ? `<span class="needs-review"><strong>${review}</strong> needing review</span>` : ''}`;
+    renderDirectory();
+  } catch (error) {
+    if (sequence !== loadSequence) return;
+    $('groups-list').innerHTML =
+      UI.empty('Your circles couldn’t load.', error.message) +
+      '<div class="empty compact"><button class="secondary" data-directory="retry">Try again</button></div>';
+  } finally {
+    if (sequence === loadSequence) $('groups-list').removeAttribute('aria-busy');
+  }
 }
 $('groups-list').onclick = (event) => {
   const button = event.target.closest('[data-group]');
   if (button) busy(button, () => loadGroup(button.dataset.group));
+  const action = event.target.closest('[data-directory]')?.dataset.directory;
+  if (action === 'create') $('create-button').click();
+  if (action === 'join') $('join-button').click();
+  if (action === 'retry') loadGroups();
+  if (action === 'clear') {
+    $('group-search').value = '';
+    $('group-filter').value = 'all';
+    renderDirectory();
+  }
 };
 $('back-button').onclick = (event) => busy(event.target, loadGroups);
 $('create-button').onclick = () => {
@@ -248,8 +358,10 @@ $('create-button').onclick = () => {
     async (values) => {
       values.frequency = $('field-frequency').value;
       group = await post('/groups', values);
+      workspaceTab = 'round';
       renderGroup();
       show('group-view');
+      setWorkspace('round');
     },
     'Create group',
   );
@@ -265,27 +377,42 @@ $('join-button').onclick = () =>
     [{ name: 'inviteCode', label: 'Invite code', maxlength: 10 }],
     async (values) => {
       group = await post('/groups/join', values);
+      workspaceTab = 'round';
       renderGroup();
       show('group-view');
+      setWorkspace('round');
     },
     'Join group',
   );
-async function loadGroup(id = group?.id) {
+async function loadGroup(id = group?.id, navigate = true) {
   if (!id) return;
   const sequence = ++loadSequence;
   const result = await request(`/groups/${id}`);
   if (sequence !== loadSequence) return;
+  if (group?.id !== id) {
+    workspaceTab = 'round';
+    $('record-search').value = '';
+    recordTab = 'contributions';
+  }
   group = result;
   order = [...group.payoutOrder];
   renderGroup();
   show('group-view');
+  setWorkspace(workspaceTab, navigate);
+  if (navigate) {
+    $('group-heading').querySelector('h1').focus({ preventScroll: true });
+    window.scrollTo({ top: 0 });
+  }
 }
 function renderGroup() {
   order = [...group.payoutOrder];
   const admin = group.currentUser.role === 'admin',
     editable = ['draft', 'completed'].includes(group.status);
+  $('group-role').textContent = admin ? 'Administrator view' : 'Member view';
   $('group-heading').innerHTML =
-    `<div><p class="eyebrow">${escape(group.frequency.toUpperCase())} SAVINGS CIRCLE</p><h1>${escape(group.name)}</h1>${badge(group.status)}</div><div class="actions">${admin && editable ? '<button class="primary" data-action="start">Start savings cycle</button><button class="quiet danger" data-action="archive">Archive group</button>' : ''}${group.status === 'review' ? '<button class="secondary" data-action="approve-review">Approve financial review</button>' : ''}</div>`;
+    `<div><p class="eyebrow">${escape(group.frequency.toUpperCase())} / ${formatMoney(group.contributionAmount)} PER MEMBER</p><h1 tabindex="-1">${escape(group.name)}</h1></div><div>${badge(group.status)}</div>`;
+  $('management-panel').innerHTML =
+    `<p class="eyebrow">CIRCLE MANAGEMENT</p><h2>${editable ? 'Ready for the next chapter?' : 'The agreements that keep us together.'}</h2><p class="small">${admin ? 'The roster, bank account and payout order stay fixed during an active cycle. Changes between cycles are visible to the group.' : 'Your administrator coordinates cycle changes. All members approve the settlement account.'}</p><div class="actions">${admin && editable ? '<button class="primary" data-action="start">Start savings cycle</button><button class="quiet danger" data-action="archive">Archive group</button>' : ''}${group.status === 'review' ? '<button class="secondary" data-action="approve-review">Approve financial review</button>' : ''}</div>`;
   const metrics = [
     [
       'Estimated ledger balance',
@@ -322,25 +449,59 @@ function renderGroup() {
   $('obligations').innerHTML = group.obligations
     .map(
       (o) =>
-        `<div class="obligation"><span>${escape(o.name)}${o.membershipId === group.currentUser.membershipId ? ' · you' : ''}</span><span class="amount">${o.due ? `${formatMoney(o.due)} due` : badge('paid')}<small>${formatMoney(o.paid)} confirmed</small></span></div>`,
+        `<div class="obligation ${o.membershipId === group.currentUser.membershipId ? 'is-you' : ''}"><span><span class="avatar" aria-hidden="true">${escape(UI.initials(o.name))}</span><span class="obligation-name">${escape(o.name)}${o.membershipId === group.currentUser.membershipId ? '<span class="you-label">you</span>' : ''}</span></span><span class="amount">${o.due ? `${formatMoney(o.due)} due` : badge('paid')}<small>${formatMoney(o.paid)} confirmed</small></span></div>`,
     )
     .join('');
   const own = group.obligations.find((o) => o.membershipId === group.currentUser.membershipId);
-  $('pay-button').hidden = group.status !== 'active';
+  const next = UI.nextStep(group);
+  $('next-step-title').textContent = next.title;
+  $('next-step-copy').textContent = next.copy;
+  $('pay-button').hidden = !next.pay;
   $('pay-button').disabled = !own?.due;
+  $('pay-button').textContent = 'Make my contribution ↗';
+  $('next-step-button').hidden = !next.target;
+  $('next-step-button').textContent = next.label || '';
+  $('next-step-button').onclick = () => {
+    if (next.target === 'payout') {
+      $('payout-panel').tabIndex = -1;
+      $('payout-panel').focus();
+      $('payout-panel').scrollIntoView({ block: 'center' });
+    } else {
+      setWorkspace(next.target);
+      $(`tab-${next.target}`).focus();
+    }
+  };
+  const paid = group.membersPaidThisRound.length;
+  $('round-progress').innerHTML =
+    group.status === 'active'
+      ? `<div class="progress-label"><span>${paid} of ${group.obligations.length} fully contributed</span><span>${Math.round((paid / Math.max(1, group.obligations.length)) * 100)}%</span></div><progress class="round-progress" value="${paid}" max="${Math.max(1, group.obligations.length)}" aria-label="Members who have completed this round’s contribution"></progress>`
+      : '';
+  $('rotation-caption').textContent =
+    group.status === 'active'
+      ? `Turn ${group.currentRound - group.cycleStartRound + 1} of ${group.cycleSize}. The agreed order stays fixed until the cycle ends.`
+      : editable
+        ? 'Agree on the order before starting. Changes can only be made between cycles.'
+        : 'The agreed payout sequence is preserved with the group record.';
+  if (group.status !== 'active' && !group.obligations.length)
+    $('obligations').innerHTML = UI.empty(
+      'A new round starts with agreement.',
+      'Contributions open when your administrator starts the cycle.',
+      true,
+    );
+  setWorkspace(workspaceTab, false);
   renderRotation();
-  const bankInfo = group.bankAccountConfigured
-    ? `<p>${escape(group.accountName)}<br><span class="small">${escape(group.bankName)} · ${escape(group.accountNumber)}</span></p>`
-    : '<p class="muted">No agreed bank account yet.</p>';
-  $('bank-panel').innerHTML =
-    `<h2>Group settlement account</h2>${bankInfo}<p class="small">All active members must approve an account proposal. Account details stay fixed during the cycle.</p>${admin && editable ? '<button class="secondary" data-action="bank">Propose bank account</button>' : ''}${group.bankChanges.map((p) => `<div class="bank-proposal"><strong>${escape(p.accountName)}</strong><p>${escape(p.bankName)} · ${escape(p.accountNumber)}</p><p>${p.approvals.length}/${group.members.length} member approvals</p><button class="quiet" data-action="approve-bank" data-id="${escape(p.id)}">Approve account / apply agreed change</button></div>`).join('')}`;
-  const payout = group.pendingPayout;
-  $('payout-panel').innerHTML =
-    `<h2>Payout this round</h2>${payout ? `<p>${escape(group.payoutHistory.find((p) => p.id === payout.id)?.memberName)} · ${formatMoney(payout.amountKobo / 100)}</p>${badge(payout.status)}<p class="small">Transfer reference: ${escape(payout.transferReference)}</p>${payout.membershipId === group.currentUser.membershipId && ['awaiting_confirmation', 'disputed'].includes(payout.status) ? `<button class="primary" data-action="confirm-payout" data-id="${escape(payout.id)}">Confirm money received</button> <button class="quiet danger" data-action="dispute-payout" data-id="${escape(payout.id)}">I have not received it</button>` : ''}` : group.currentRecipient ? `<p>Next recipient: <strong>${escape(group.currentRecipient.name)}</strong></p><p>${formatMoney(group.contributionAmount * group.cycleSize)} · ${group.membersPaidThisRound.length}/${group.members.length} members fully paid</p>${admin ? '<button class="secondary" data-action="reconcile">Record settled bank balance</button><button class="primary full" data-action="payout">Record manual transfer</button>' : ''}` : '<p class="muted">Start a cycle to see the next recipient.</p>'}${admin && group.status === 'review' ? '<button class="secondary" data-action="reconcile">Record reviewed bank balance</button>' : ''}<p class="small">Ajo does not send this payout. Record your completed bank transfer, then the recipient confirms receipt.</p>`;
-  $('members-panel').innerHTML =
-    `<h2>Members & invitations</h2>${group.inviteCode && editable ? `<p class="small">Invite code: <strong>${escape(group.inviteCode)}</strong> <button class="quiet" data-action="copy">Copy</button></p>` : ''}${group.members.map((m) => `<div class="member-row"><span>${escape(m.name)} ${m.role === 'admin' ? badge('admin') : ''}</span>${admin && editable && m.role !== 'admin' ? `<span><button class="quiet" data-action="transfer-admin" data-id="${escape(m.membershipId)}">Make admin</button> · <button class="quiet danger" data-action="remove" data-id="${escape(m.membershipId)}">Remove</button></span>` : ''}</div>`).join('')}<p class="small">Removing a member keeps their financial history.</p>`;
+  $('bank-panel').innerHTML = UI.bankPanel(group);
+  $('payout-panel').innerHTML = UI.payoutPanel(group);
+  $('members-panel').innerHTML = UI.membersPanel(group);
   const recordTransfer = document.querySelector('[data-action="payout"]');
-  if (recordTransfer) recordTransfer.disabled = !group.allPaidThisRound;
+  if (recordTransfer) {
+    recordTransfer.disabled = !group.allPaidThisRound;
+    if (!group.allPaidThisRound)
+      recordTransfer.insertAdjacentHTML(
+        'afterend',
+        '<p class="small">Available once every member has completed their contribution.</p>',
+      );
+  }
   $('export-link').href = `/api/groups/${group.id}/export`;
   renderRecords();
 }
@@ -351,7 +512,7 @@ function renderRotation() {
   $('rotation').innerHTML = order
     .map(
       (id, index) =>
-        `<li><span><span class="position">${index + 1}</span>${escape(group.members.find((m) => m.membershipId === id)?.name)} ${group.currentRecipient?.membershipId === id ? badge('next') : ''}</span>${editable ? `<span class="order-controls"><button data-move="${index}" data-direction="-1" aria-label="Move recipient up" ${index === 0 ? 'disabled' : ''}>↑</button><button data-move="${index}" data-direction="1" aria-label="Move recipient down" ${index === order.length - 1 ? 'disabled' : ''}>↓</button></span>` : ''}</li>`,
+        `<li class="${group.status === 'active' && index === group.currentRound - group.cycleStartRound ? 'current' : group.status === 'active' && index < group.currentRound - group.cycleStartRound ? 'completed' : ''}"><span><span class="position">${index + 1}</span>${escape(group.members.find((m) => m.membershipId === id)?.name)} ${group.currentRecipient?.membershipId === id ? badge('next') : ''}</span>${editable ? `<span class="order-controls"><button data-move="${index}" data-direction="-1" aria-label="Move ${escape(group.members.find((m) => m.membershipId === id)?.name)} up" ${index === 0 ? 'disabled' : ''}>↑</button><button data-move="${index}" data-direction="1" aria-label="Move ${escape(group.members.find((m) => m.membershipId === id)?.name)} down" ${index === order.length - 1 ? 'disabled' : ''}>↓</button></span>` : ''}</li>`,
     )
     .join('');
 }
@@ -362,6 +523,9 @@ $('rotation').onclick = (event) => {
     to = from + Number(button.dataset.direction);
   [order[from], order[to]] = [order[to], order[from]];
   renderRotation();
+  const direction = to === 0 ? '1' : to === order.length - 1 ? '-1' : button.dataset.direction;
+  document.querySelector(`[data-move="${to}"][data-direction="${direction}"]`)?.focus();
+  $('order-notice').textContent = 'Order changed. Save it to share with your circle.';
 };
 $('save-order').onclick = (event) =>
   busy(event.target, async () => {
@@ -370,38 +534,61 @@ $('save-order').onclick = (event) =>
       body: JSON.stringify({ order }),
     });
     await loadGroup();
+    $('order-notice').textContent = 'Payout order saved.';
+    $('save-order').focus();
     notice('Payout order saved.');
   });
 function renderRecords() {
   document
     .querySelectorAll('[data-record]')
-    .forEach((button) => button.classList.toggle('selected', button.dataset.record === recordTab));
+    .forEach((button) => UI.selectTab(button, button.dataset.record === recordTab));
+  $('records').setAttribute('aria-labelledby', `record-${recordTab}`);
   let rows;
   if (recordTab === 'contributions')
     rows = [...group.contributions]
       .reverse()
       .map(
         (c) =>
-          `<div class="record"><div><strong>${escape(c.memberName)}</strong><p>Round ${c.round + 1} · ${date(c.date)}</p><p>${escape(c.paymentReference)}</p>${badge(c.disputed ? 'disputed' : c.status)}${['initializing', 'pending', 'unknown'].includes(c.status) ? ` <button class="quiet" data-action="verify" data-id="${escape(c.paymentReference)}">Check payment</button>` : ''}${c.refundedAmount ? `<p>${formatMoney(c.refundedAmount)} refunded</p>` : ''}</div><span class="amount">${formatMoney(c.amount)}</span></div>`,
+          `<div class="record"><div><strong>${escape(c.memberName)}</strong><p>Round ${c.round + 1} · ${date(c.date)}</p><p class="reference">${escape(c.paymentReference)}</p>${badge(c.disputed ? 'disputed' : c.status)}${['initializing', 'pending', 'unknown'].includes(c.status) ? ` <button class="quiet" data-action="verify" data-id="${escape(c.paymentReference)}">Check payment</button>` : ''}${c.refundedAmount ? `<p>${formatMoney(c.refundedAmount)} refunded</p>` : ''}</div><span class="amount">${formatMoney(c.amount)}</span></div>`,
       );
   else if (recordTab === 'payouts')
     rows = [...group.payoutHistory]
       .reverse()
       .map(
         (p) =>
-          `<div class="record"><div><strong>${escape(p.memberName)}</strong><p>Round ${p.round + 1} · ${date(p.date)}</p><p>${escape(p.transferReference || 'Historical record — unverified')}</p>${badge(p.status)}</div><span class="amount">${formatMoney(p.amount)}</span></div>`,
+          `<div class="record"><div><strong>${escape(p.memberName)}</strong><p>Round ${p.round + 1} · ${date(p.date)}</p><p class="reference">${escape(p.transferReference || 'Historical record — unverified')}</p>${badge(p.status)}</div><span class="amount">${formatMoney(p.amount)}</span></div>`,
       );
   else
     rows = group.auditEvents.map(
       (a) =>
-        `<div class="record"><div><strong>${escape(a.action.replaceAll('.', ' '))}</strong><p>${date(a.createdAt)}</p><p>${escape(JSON.stringify(a.data))}</p></div></div>`,
+        `<div class="record"><div><strong>${escape(UI.activity(a))}</strong><p>${date(a.createdAt)}</p><details><summary>Record details</summary><pre>${escape(JSON.stringify(a.data, null, 2))}</pre></details></div></div>`,
     );
-  $('records').innerHTML = rows.length ? rows.join('') : '<p class="empty">No records yet.</p>';
+  const query = $('record-search').value.trim().toLocaleLowerCase();
+  if (query)
+    rows = rows.filter((row) => {
+      const template = document.createElement('template');
+      template.innerHTML = row;
+      return template.content.textContent.toLocaleLowerCase().includes(query);
+    });
+  const emptyCopy =
+    recordTab === 'contributions'
+      ? 'Confirmed and pending contributions will appear here, with a reference for each payment.'
+      : recordTab === 'payouts'
+        ? 'Completed transfers and recipient confirmations will appear here.'
+        : 'Changes to the circle will appear here as they happen.';
+  $('records').innerHTML = rows.length
+    ? rows.join('')
+    : UI.empty(
+        query ? 'No matching records.' : 'The record starts here.',
+        query ? 'Try another name or reference. Search covers displayed records only.' : emptyCopy,
+        true,
+      );
 }
 document.querySelectorAll('[data-record]').forEach(
   (button) =>
     (button.onclick = () => {
       recordTab = button.dataset.record;
+      $('record-search').value = '';
       renderRecords();
     }),
 );
@@ -477,14 +664,17 @@ $('group-view').addEventListener('click', (event) => {
       'afterbegin',
       '<label for="field-bankCode">Bank</label><select id="field-bankCode" name="bankCode" required><option value="">Loading banks…</option></select>',
     );
+    const bankSelect = $('field-bankCode');
     request('/paystack/banks')
       .then((banks) => {
-        $('field-bankCode').innerHTML =
+        if (!bankSelect.isConnected) return;
+        bankSelect.innerHTML =
           '<option value="">Choose bank</option>' +
           banks.map((b) => `<option value="${escape(b.code)}">${escape(b.name)}</option>`).join('');
       })
       .catch((error) => {
-        $('action-error').textContent = error.message;
+        if (bankSelect.isConnected)
+          $('action-error').textContent = error.message + ' Close this form and try again.';
       });
   }
   if (action === 'approve-bank')
@@ -581,10 +771,57 @@ $('group-view').addEventListener('click', (event) => {
       notice('Invite code copied.');
     });
 });
+$('show-password').onclick = () => {
+  const visible = $('auth-password').type === 'password';
+  $('auth-password').type = visible ? 'text' : 'password';
+  $('show-password').textContent = visible ? 'Hide' : 'Show';
+  $('show-password').setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+  $('show-password').setAttribute('aria-pressed', String(visible));
+};
+$('group-search').oninput = renderDirectory;
+$('group-filter').onchange = renderDirectory;
+$('record-search').oninput = renderRecords;
+$('refresh-group').onclick = (event) =>
+  busy(event.currentTarget, async () => {
+    await loadGroup(group.id, false);
+    notice('Circle records refreshed.');
+  });
+document
+  .querySelectorAll('[data-workspace]')
+  .forEach((button) => (button.onclick = () => setWorkspace(button.dataset.workspace)));
+document.querySelectorAll('[role="tablist"]').forEach(UI.keyboardTabs);
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.account-menu')) $('account-menu').open = false;
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && $('account-menu').open) {
+    $('account-menu').open = false;
+    $('account-menu').querySelector('summary').focus();
+  }
+});
+async function openLocation() {
+  const route = new URLSearchParams(location.hash.slice(1));
+  if (!user) return;
+  try {
+    if (route.has('group')) {
+      await loadGroup(route.get('group'), false);
+      setWorkspace(route.get('view') || 'round', false);
+    } else await loadGroups(false);
+  } catch (error) {
+    await loadGroups(false);
+    notice(error.message, true);
+  }
+}
+window.addEventListener('popstate', () => {
+  if (!$('action-submit').disabled) {
+    $('action-dialog').close();
+    openLocation();
+  }
+});
 (async () => {
   try {
     user = await request('/auth/me');
-    await loadGroups();
+    await openLocation();
     if (user.paymentEnvironment === 'test')
       notice('Test payment mode. No real money is collected.');
   } catch (error) {

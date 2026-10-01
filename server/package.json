@@ -17,7 +17,8 @@
     "reconcile": "node scripts-reconcile.js",
     "reconcile:legacy": "node scripts-legacy-payment.js",
     "check": "node scripts-check.js",
-    "format": "prettier --write ../public/*.{html,css,js} src/*.js test/*.js *.js ../README.md ../docs/*.md"
+    "format": "prettier --write ../public/*.{html,css,js} src/*.js test/*.js *.js ../README.md ../docs/*.md",
+    "test:ui": "playwright test"
   },
   "engines": {
     "node": ">=22"
@@ -41,7 +42,9 @@
     "nodemailer": "^10.0.13"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.63.0",
     "prettier": "^3.9.9",
     "prisma": "^5.19.1",
     "supertest": "^7.3.0"

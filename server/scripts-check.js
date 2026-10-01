@@ -18,4 +18,7 @@ execFileSync(process.execPath, ['--check', path.join(__dirname, 'server.js')], {
 execFileSync(process.execPath, ['--check', path.join(__dirname, '../public/script.js')], {
   stdio: 'inherit',
 });
+execFileSync(process.execPath, ['--check', path.join(__dirname, '../public/ui.js')], {
+  stdio: 'inherit',
+});
 console.log('JavaScript syntax checks passed.');

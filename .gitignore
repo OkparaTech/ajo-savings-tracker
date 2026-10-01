@@ -3,3 +3,7 @@ node_modules/
 .DS_Store
 npm-debug.log*
 server/prisma/generated/
+
+# Browser test output
+server/test-results/
+server/playwright-report/

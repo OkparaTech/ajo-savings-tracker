@@ -3,50 +3,103 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#183f35" />
-    <title>Ajo — Group savings, clearly accounted for</title>
+    <meta name="theme-color" content="#183e35" />
+    <meta
+      name="description"
+      content="A shared ledger for your ajo, esusu or thrift group. Follow contributions, agree on payout order, and see every step of your savings cycle."
+    />
+    <title>Ajo — Your shared savings ledger</title>
+    <link rel="icon" href="/mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
+    <script src="/ui.js" defer></script>
     <script src="/script.js" defer></script>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <a class="brand" href="/" aria-label="Ajo home"
-        ><span class="brand-mark">a</span>Ajo<span class="brand-note">GROUP SAVINGS</span></a
+        ><img src="/mark.svg" width="34" height="34" alt="" /><span
+          >Ajo<span class="brand-period">.</span></span
+        ><span class="brand-note">THE SHARED LEDGER</span></a
       >
       <div id="account-controls" hidden>
-        <span id="welcome"></span
-        ><button id="verify-email-button" class="quiet" hidden>Verify email</button
-        ><button id="password-button" class="quiet">Change password</button
-        ><button id="logout-button" class="quiet">Log out</button>
+        <span id="environment-label" class="environment-label" hidden>Test payments</span>
+        <button id="verify-email-button" class="quiet" hidden>Verify email</button>
+        <details class="account-menu" id="account-menu">
+          <summary>
+            <span class="avatar" id="account-initial" aria-hidden="true"></span
+            ><span id="welcome"></span><span aria-hidden="true">⌄</span>
+          </summary>
+          <div class="account-popover">
+            <p class="eyebrow">YOUR ACCOUNT</p>
+            <button id="password-button" class="quiet">Change password</button
+            ><button id="logout-button" class="quiet">Log out</button>
+          </div>
+        </details>
       </div>
+      <span id="guest-note" class="header-note">A little together. A lot further.</span>
     </header>
-    <main>
+    <main id="main" tabindex="-1">
       <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
-      <section id="auth-view" class="auth-layout" hidden>
+      <div id="boot-state" class="boot-state" role="status">
+        <span class="loading-line" aria-hidden="true"></span>Opening your shared ledger…
+      </div>
+      <section id="auth-view" class="auth-layout" aria-label="Welcome to Ajo" hidden>
         <div class="intro">
-          <p class="eyebrow">SAVE TOGETHER. SEE EVERY STEP.</p>
-          <h1>A clear record.<br />A fair rotation.</h1>
-          <p>Know what is due, what has been paid, and whose turn comes next.</p>
-          <div class="promise">
-            <span>01</span>
-            <p>Members and payout order stay fixed during a savings cycle.</p>
-            <span>02</span>
-            <p>Every confirmed contribution has a payment reference.</p>
-            <span>03</span>
-            <p>The recipient confirms a manual payout before the next round.</p>
-          </div>
-          <p class="small">
-            Contributions settle into your group’s nominated bank account. Ajo records activity; it
-            does not hold or guarantee your savings.
+          <p class="eyebrow">YOUR PEOPLE. YOUR PACE.</p>
+          <h1>Good things <br />come <em>around.</em></h1>
+          <p class="intro-copy">
+            Save together. Take your turn.<br />Keep every contribution in view.
           </p>
-        </div>
-        <div class="panel auth-panel">
-          <div class="tabs">
-            <button id="login-tab" class="selected" type="button">Log in</button
-            ><button id="signup-tab" type="button">Create account</button>
+          <div class="cycle-explainer" aria-label="How a savings cycle works">
+            <div class="cycle-line" aria-hidden="true"></div>
+            <div>
+              <span class="cycle-node">01</span><strong>Contribute</strong>
+              <p>Everyone adds<br />their agreed share.</p>
+            </div>
+            <div>
+              <span class="cycle-node">02</span><strong>Receive</strong>
+              <p>One member takes<br />their turn.</p>
+            </div>
+            <div>
+              <span class="cycle-node">03</span><strong>Repeat</strong>
+              <p>Keep going until<br />everyone receives.</p>
+            </div>
           </div>
-          <form id="auth-form">
-            <h2 id="auth-heading">Welcome back</h2>
+          <div class="intro-foot">
+            <span aria-hidden="true">↳</span>
+            <p>Ajo, esusu, thrift.<br />A familiar practice. A clearer record.</p>
+          </div>
+        </div>
+        <div class="auth-panel">
+          <p class="eyebrow">MAKE ROOM FOR WHAT’S NEXT</p>
+          <div class="tabs auth-tabs" role="tablist" aria-label="Account access">
+            <button
+              id="login-tab"
+              class="selected"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="auth-form"
+            >
+              Log in
+            </button>
+            <button
+              id="signup-tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="auth-form"
+              tabindex="-1"
+            >
+              Create account
+            </button>
+          </div>
+          <form id="auth-form" role="tabpanel" aria-labelledby="login-tab">
+            <h2 id="auth-heading">Welcome back.</h2>
+            <p id="auth-description" class="muted">
+              Your circles, contributions and next steps, in one place.
+            </p>
             <div id="name-field" hidden>
               <label for="auth-name">Full name</label
               ><input id="auth-name" name="name" maxlength="80" autocomplete="name" />
@@ -59,97 +112,260 @@
               required
               maxlength="254"
               autocomplete="email"
-            /><label for="auth-password">Password</label
-            ><input
-              id="auth-password"
-              name="password"
-              type="password"
-              required
-              autocomplete="current-password"
+              placeholder="you@example.com"
             />
+            <label for="auth-password">Password</label>
+            <div class="password-input">
+              <input
+                id="auth-password"
+                name="password"
+                type="password"
+                required
+                autocomplete="current-password"
+                aria-describedby="password-hint"
+              /><button
+                type="button"
+                id="show-password"
+                class="quiet"
+                aria-label="Show password"
+                aria-pressed="false"
+              >
+                Show
+              </button>
+            </div>
             <p id="password-hint" class="small" hidden>
-              Use at least 12 characters. Maximum 72 bytes.
+              At least 12 characters. A memorable phrase works well.
             </p>
-            <button class="primary full" id="auth-submit">Log in</button
-            ><button type="button" id="forgot-password-button" class="quiet">
+            <button class="primary full" id="auth-submit">Log in</button>
+            <button type="button" id="forgot-password-button" class="quiet">
               Forgot password?
             </button>
             <p id="auth-error" class="error" role="alert"></p>
           </form>
+          <p class="auth-disclosure">
+            Your group’s money settles into its nominated bank account. Ajo keeps the record; it
+            does not hold or guarantee your savings.
+          </p>
         </div>
       </section>
-      <section id="groups-view" hidden>
-        <div class="page-heading">
+      <section id="groups-view" aria-labelledby="groups-title" hidden>
+        <div class="page-heading directory-heading">
           <div>
-            <p class="eyebrow">YOUR SAVINGS CIRCLES</p>
-            <h1>Keep the group in sync.</h1>
-            <p class="muted">
-              A shared record of contributions, obligations, and confirmed payouts.
-            </p>
+            <p class="eyebrow" id="greeting">YOUR SHARED SAVINGS</p>
+            <h1 id="groups-title" tabindex="-1">Your circles<span class="accent">.</span></h1>
+            <p class="muted">Different goals. The same commitment to each other.</p>
           </div>
           <div class="actions">
-            <button id="join-button" class="secondary">Join a group</button
-            ><button id="create-button" class="primary">Create group</button>
+            <button id="join-button" class="secondary">Join with a code</button
+            ><button id="create-button" class="primary">
+              Create a circle <span aria-hidden="true">↗</span>
+            </button>
           </div>
         </div>
-        <div id="groups-list" class="groups-grid"></div>
-      </section>
-      <section id="group-view" hidden>
-        <button id="back-button" class="quiet back">← Your groups</button>
-        <div id="group-heading" class="page-heading"></div>
-        <div id="group-summary" class="metrics"></div>
-        <div id="group-guidance" class="guidance"></div>
-        <div class="workspace">
+        <div id="directory-summary" class="directory-summary"></div>
+        <div class="directory-tools" id="directory-tools" hidden>
+          <div class="search-field">
+            <label class="sr-only" for="group-search">Find a circle</label
+            ><span aria-hidden="true">⌕</span
+            ><input
+              id="group-search"
+              type="search"
+              placeholder="Find a circle…"
+              autocomplete="off"
+            />
+          </div>
           <div>
-            <section class="panel">
+            <label class="sr-only" for="group-filter">Circle status</label
+            ><select id="group-filter">
+              <option value="all">All circles</option>
+              <option value="active">Active</option>
+              <option value="draft">Getting started</option>
+              <option value="review">Needs review</option>
+              <option value="completed">Completed</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+          <p id="group-count" class="small" role="status"></p>
+        </div>
+        <div id="groups-list" class="groups-list" aria-live="polite"></div>
+        <div class="directory-foot">
+          <span class="eyebrow">A RECORD YOU SHARE</span>
+          <p>Contributions are visible. The order is agreed.<br />Every turn belongs to someone.</p>
+        </div>
+      </section>
+      <section id="group-view" aria-label="Savings circle workspace" hidden>
+        <div class="workspace-breadcrumb">
+          <button id="back-button" class="quiet back">← Your circles</button
+          ><span class="small" id="group-role"></span>
+        </div>
+        <div id="group-heading" class="page-heading"></div>
+        <div class="workspace-nav">
+          <div class="tabs workspace-tabs" role="tablist" aria-label="Circle workspace">
+            <button
+              id="tab-round"
+              data-workspace="round"
+              role="tab"
+              aria-selected="true"
+              aria-controls="view-round"
+              class="selected"
+            >
+              This round
+            </button>
+            <button
+              id="tab-ledger"
+              data-workspace="ledger"
+              role="tab"
+              aria-selected="false"
+              aria-controls="view-ledger"
+              tabindex="-1"
+            >
+              Ledger
+            </button>
+            <button
+              id="tab-details"
+              data-workspace="details"
+              role="tab"
+              aria-selected="false"
+              aria-controls="view-details"
+              tabindex="-1"
+            >
+              Group details
+            </button>
+          </div>
+          <button id="refresh-group" class="quiet" aria-label="Refresh group records">
+            ↻ <span>Refresh</span>
+          </button>
+        </div>
+        <div id="view-round" role="tabpanel" aria-labelledby="tab-round" tabindex="0">
+          <div id="next-step" class="next-step">
+            <div>
+              <p class="eyebrow">YOUR NEXT STEP</p>
+              <h2 id="next-step-title"></h2>
+              <p id="next-step-copy"></p>
+            </div>
+            <div class="next-step-action">
+              <button id="pay-button" class="primary" hidden>Make a contribution</button
+              ><button id="next-step-button" class="secondary" hidden></button>
+            </div>
+          </div>
+          <div id="group-summary" class="metrics"></div>
+          <div class="workspace">
+            <section class="panel obligation-panel">
               <div class="section-title">
-                <h2>Contribution obligations</h2>
+                <div>
+                  <p class="eyebrow">01 / CONTRIBUTIONS</p>
+                  <h2>Everyone’s part.</h2>
+                </div>
                 <span id="due-label" class="small"></span>
               </div>
+              <div id="round-progress"></div>
               <div id="obligations"></div>
-              <button id="pay-button" class="primary full">Make a contribution</button>
             </section>
-            <section class="panel">
+            <section id="payout-panel" class="panel payout-panel"></section>
+            <section class="panel rotation-panel">
               <div class="section-title">
-                <h2>Payout rotation</h2>
+                <div>
+                  <p class="eyebrow">02 / THE ROTATION</p>
+                  <h2>A turn for everyone.</h2>
+                </div>
                 <button id="save-order" class="quiet" hidden>Save order</button>
               </div>
+              <p id="rotation-caption" class="small"></p>
               <ol id="rotation" class="rotation"></ol>
+              <p id="order-notice" class="small" role="status"></p>
             </section>
-            <section id="bank-panel" class="panel"></section>
           </div>
-          <div>
-            <section id="payout-panel" class="panel"></section>
-            <section class="panel">
-              <div class="section-title">
-                <h2>Financial record</h2>
-                <a id="export-link" class="quiet" href="#">Export CSV</a>
-              </div>
-              <div class="tabs record-tabs">
-                <button data-record="contributions" class="selected">Contributions</button
-                ><button data-record="payouts">Payouts</button
-                ><button data-record="audit">Activity</button>
-              </div>
-              <div id="records" class="records"></div>
-              <p class="small">
-                Latest 100 financial records / 50 activity events shown. Export the full financial
-                history as CSV.
-              </p>
-            </section>
-            <section id="members-panel" class="panel"></section>
+          <p id="group-guidance" class="guidance"></p>
+        </div>
+        <section
+          id="view-ledger"
+          class="panel ledger-panel"
+          role="tabpanel"
+          aria-labelledby="tab-ledger"
+          tabindex="0"
+          hidden
+        >
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">THE SHARED RECORD</p>
+              <h2>Every contribution. Every turn.</h2>
+            </div>
+            <a id="export-link" class="secondary export-link" href="#"
+              >Export CSV <span aria-hidden="true">↓</span></a
+            >
           </div>
+          <div class="ledger-controls">
+            <div class="tabs record-tabs" role="tablist" aria-label="Record type">
+              <button
+                id="record-contributions"
+                data-record="contributions"
+                role="tab"
+                aria-controls="records"
+                aria-selected="true"
+                class="selected"
+              >
+                Contributions</button
+              ><button
+                id="record-payouts"
+                data-record="payouts"
+                role="tab"
+                aria-controls="records"
+                aria-selected="false"
+                tabindex="-1"
+              >
+                Payouts</button
+              ><button
+                id="record-audit"
+                data-record="audit"
+                role="tab"
+                aria-controls="records"
+                aria-selected="false"
+                tabindex="-1"
+              >
+                Activity
+              </button>
+            </div>
+            <label class="sr-only" for="record-search">Search displayed records</label
+            ><input id="record-search" type="search" placeholder="Find a name or reference…" />
+          </div>
+          <div
+            id="records"
+            class="records"
+            role="tabpanel"
+            aria-labelledby="record-contributions"
+            tabindex="0"
+          ></div>
+          <p class="small record-limit">
+            Search covers the latest 100 financial records or 50 activity events. Export CSV for the
+            complete financial history.
+          </p>
+        </section>
+        <div
+          id="view-details"
+          class="details-grid"
+          role="tabpanel"
+          aria-labelledby="tab-details"
+          tabindex="0"
+          hidden
+        >
+          <section id="bank-panel" class="panel"></section>
+          <section id="members-panel" class="panel"></section>
+          <section class="panel management-panel" id="management-panel"></section>
         </div>
       </section>
     </main>
     <footer>
-      Shared records. Clear obligations.
-      <span>Manual payouts need bank evidence and recipient confirmation.</span>
+      <a class="footer-brand" href="/">Ajo.</a>
+      <p>Shared savings. Clearly accounted for.</p>
+      <span>Built for the way we save together.</span>
     </footer>
-    <dialog id="action-dialog">
+    <dialog id="action-dialog" aria-labelledby="action-title" aria-describedby="action-description">
       <form id="action-form">
         <div class="section-title">
           <h2 id="action-title"></h2>
-          <button type="button" id="close-dialog" class="quiet" aria-label="Close dialog">✕</button>
+          <button type="button" id="close-dialog" class="icon-button" aria-label="Close dialog">
+            ×
+          </button>
         </div>
         <p id="action-description" class="muted"></p>
         <div id="action-fields"></div>
@@ -157,5 +373,10 @@
         <button id="action-submit" class="primary full">Continue</button>
       </form>
     </dialog>
+    <noscript
+      ><p class="notice">
+        Enable JavaScript to open your savings circles and make contributions.
+      </p></noscript
+    >
   </body>
 </html>
