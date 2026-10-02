@@ -21,6 +21,7 @@ Contributions settle to the group’s nominated bank account. This application d
 
 ## Stack
 
+
 Node.js 22+, Express 4, PostgreSQL, Prisma 5, Paystack, Nodemailer SMTP, plain HTML/CSS/JavaScript. There is no frontend build step.
 
 ## Local setup
