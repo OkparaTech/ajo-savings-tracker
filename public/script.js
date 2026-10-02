@@ -50,6 +50,10 @@ function show(id) {
     $('environment-label').hidden = user.paymentEnvironment !== 'test';
     $('greeting').textContent = `YOUR SHARED SAVINGS / ${user.name.split(' ')[0].toUpperCase()}`;
     $('verify-email-button').hidden = user.emailVerified;
+    $('verify-email-button').disabled = !user.emailDeliveryEnabled;
+    $('verify-email-button').textContent = user.emailDeliveryEnabled
+      ? 'Verify email'
+      : 'Email unavailable in this preview';
   }
 }
 async function request(url, options = {}) {

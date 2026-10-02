@@ -12,11 +12,18 @@ if (
 )
   throw new Error('Set APP_URL to the production HTTPS origin.');
 const mailer = createMailer();
-if (process.env.NODE_ENV === 'production' && !mailer)
-  throw new Error('Configure SMTP_HOST and SMTP_FROM before production launch.');
+const paystack = createPaystack(process.env.PAYSTACK_SECRET_KEY);
+if (paystack.environment === 'live' && !mailer)
+  throw new Error(
+    'Configure SMTP_HOST and SMTP_FROM before using live payments. Use a Paystack test key for previews without email.',
+  );
+if (!mailer)
+  console.warn(
+    'Email is unavailable in this preview: verification, password reset and reminders are disabled.',
+  );
 const app = createApp({
   prisma,
-  paystack: createPaystack(process.env.PAYSTACK_SECRET_KEY),
+  paystack,
   appUrl,
   mailer,
 });

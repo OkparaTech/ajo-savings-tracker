@@ -17,11 +17,19 @@ Do not roll an old app back against the migrated schema. Restore the reviewed ba
 
 - Node.js 22 or later; start command `npm start` inside `server`.
 - Build/install: `npm ci`. Run migrations as a controlled release step, not on every web process restart.
-- Required: PostgreSQL `DATABASE_URL`, HTTPS `APP_URL`, `NODE_ENV=production`, Paystack key, SMTP host/from and appropriate SMTP authentication.
+- Required: PostgreSQL `DATABASE_URL`, HTTPS `APP_URL`, `NODE_ENV=production`, and a valid Paystack key. Live payments additionally require SMTP host/from and appropriate SMTP authentication.
 - `APP_URL` must be the exact browser origin; redirects and CSRF checks rely on it.
 - Set `TRUST_PROXY_HOPS` only after confirming the number of trusted ingress proxies. Do not blindly trust arbitrary forwarded headers.
 - Configure provider webhook at `APP_URL/api/webhooks/paystack`.
 - Provider fees and settlement delays must be reconciled with the merchant account and bank. The app does not fabricate settlement confirmations or assert that gross charges equal settled funds.
+
+## Render preview without email
+
+Keep `NODE_ENV=production` and set `APP_URL=https://ajo-savings-tracker-3qh3.onrender.com` for this deployment. Use your actual Paystack **test** secret key (`sk_test_...`). Leave SMTP variables unset until you have an email provider. No database migration is needed for this configuration change.
+
+The server starts without SMTP when using test payments. Registration, login and signed-in password changes remain available. Email verification, forgotten-password recovery and reminders are unavailable; accounts are not automatically marked verified. Keep your preview account password. Live-key startup still requires email configuration.
+
+Before launch, configure all SMTP settings, redeploy and test actual verification/reset delivery and reminders. Then use the launch acceptance checklist below before enabling live payments.
 
 ## Database permissions
 

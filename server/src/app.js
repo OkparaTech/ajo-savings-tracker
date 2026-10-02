@@ -181,6 +181,10 @@ function createApp({ prisma, paystack, appUrl, mailer = null, logger = console, 
     authLimit,
     emailLimit,
     wrap(async (req, res) => {
+      if (!mailer)
+        return res.status(503).json({
+          error: 'Password reset is unavailable while email delivery is not configured.',
+        });
       const email = emailValue(req.body?.email);
       const user = await prisma.user.findUnique({ where: { email } });
       if (user) await sendAccountLink(prisma, mailer, user, 'reset', origin);
