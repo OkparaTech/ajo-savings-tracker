@@ -30,7 +30,7 @@ Node.js 22+, Express 4, PostgreSQL, Prisma 5, Paystack, Nodemailer SMTP, plain H
 cd server
 cp .env.example .env
 npm ci
-npm run prisma:deploy
+npm run prisma: deploy
 npm start
 ```
 
